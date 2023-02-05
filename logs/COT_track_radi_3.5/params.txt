@@ -1,0 +1,3 @@
+COT params setting 
+radius 3.5, n_ins 10, step_num 100 
+Maxiter = 20 

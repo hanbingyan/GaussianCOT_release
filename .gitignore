@@ -1,0 +1,7 @@
+
+logs/.DS_Store
+.DS_Store
+*.pyc
+*.xml
+*.iml
+.ipynb_checkpoints
