@@ -12,7 +12,7 @@ warnings.filterwarnings("ignore", message="delta_grad == 0.0. Check if the appro
 # Transaction cost percentage
 trcost_perc = 0.0001
 MaxIter = 20
-CAUSAL = False
+CAUSAL = True
 ROBUST = True
 # m is dim of observations
 m_dim = 1

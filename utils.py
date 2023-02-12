@@ -3,6 +3,7 @@ from scipy.optimize import minimize
 from scipy.linalg import sqrtm
 from scipy.optimize import NonlinearConstraint
 
+# Flatten a symmetric matrix to a vector, diagonal entries first
 def inver_sym(A, dim):
     if dim == 1:
         return [A[0, 0]]
@@ -15,6 +16,7 @@ def inver_sym(A, dim):
             x.append(A[i, j])
     return x
 
+# Construct a symmetric matrix from a vector, diagonal entries first
 def sym_matrix(x, dim):
     res = np.zeros((dim, dim))
     for l in range(dim):
@@ -28,6 +30,7 @@ def sym_matrix(x, dim):
         res[j, i] = x[k+dim]
     return res
 
+# k-th diagonal entry of D
 def kth_diag(psd, k):
     if k == 0:
         return psd[0, 0]
@@ -40,7 +43,7 @@ def kth_diag(psd, k):
 
 
 def optimize(m_dim, n_dim, radius, A, Bp, C, Dp, Sigp, current_obs, pred_mean, maxit, causal=True, robust=True):
-
+    # Bp, Dp are reference model parameters
     if robust==False:
         M = np.matmul(np.matmul(np.matmul(C, A), Sigp), A.T) + np.matmul(C, Bp)
         K = np.matmul(np.matmul(np.matmul(np.matmul(C, A), Sigp), A.T), C.T) + np.matmul(np.matmul(C, Bp), C.T) + Dp
@@ -67,7 +70,7 @@ def optimize(m_dim, n_dim, radius, A, Bp, C, Dp, Sigp, current_obs, pred_mean, m
         D = sym_matrix(x[int((n_dim ** 2 + n_dim) / 2):int((n_dim ** 2 + n_dim) / 2 + (m_dim ** 2 + m_dim) / 2)], m_dim)
         Sig = sym_matrix(x[int((n_dim ** 2 + n_dim) / 2 + (m_dim ** 2 + m_dim) / 2):], n_dim)
 
-        # first row
+        # Construct bi-causal OT distance (Corollary 2.2)
         fp1_row = np.concatenate((Bp, np.matmul(Bp, C.T)), axis=1)
         sp2_row = np.concatenate((np.matmul(C, Bp), np.matmul(np.matmul(C, Bp), C.T) + Dp), axis=1)
         Block_BCp = np.concatenate((fp1_row, sp2_row), axis=0)
