@@ -39,12 +39,10 @@ def kth_diag(psd, k):
     else:
         return psd[k, k] - np.matmul(np.matmul(psd[:k,k], np.linalg.inv(psd[:k, :k])), psd[k, :k])
 
-
-
-
-def optimize(m_dim, n_dim, radius, A, Bp, C, Dp, Sigp, current_obs, pred_mean, maxit, causal=True, robust=True):
+def optimize(m_dim, n_dim, radius, A, Bp, C, Dp, Sigp, current_obs, pred_mean, maxit, algo='BCOT'):
     # Bp, Dp are reference model parameters
-    if robust==False:
+    # Algorithm can choose 'BCOT', 'OT', 'KL' or 'Nonrobust'
+    if algo == 'Nonrobust':
         M = np.matmul(np.matmul(np.matmul(C, A), Sigp), A.T) + np.matmul(C, Bp)
         K = np.matmul(np.matmul(np.matmul(np.matmul(C, A), Sigp), A.T), C.T) + np.matmul(np.matmul(C, Bp), C.T) + Dp
 
@@ -128,6 +126,7 @@ def optimize(m_dim, n_dim, radius, A, Bp, C, Dp, Sigp, current_obs, pred_mean, m
                                  np.matmul(np.matmul(np.matmul(np.matmul(C, A), Sig), A.T), C.T)), axis=1)
         Alter_var = np.concatenate((f1_row, f2_row, f3_row), axis=0)
 
+
         # trace
         Ref_sq = sqrtm(Ref_var)
         # last term in trace
@@ -139,6 +138,59 @@ def optimize(m_dim, n_dim, radius, A, Bp, C, Dp, Sigp, current_obs, pred_mean, m
 
         res = np.zeros(2 * n_dim + m_dim + 1)
         res[0] = radius - TR
+
+        # B psd constraint
+        for k in range(n_dim):
+            res[k + 1] = kth_diag(B, k)
+
+        # D psd constraint
+        for k in range(m_dim):
+            res[k + n_dim + 1] = kth_diag(D, k)
+
+        # Sig psd constraint
+        for k in range(n_dim):
+            res[k + n_dim + m_dim + 1] = kth_diag(Sig, k)
+
+        return res
+
+
+    def KL_cons(x):
+        B = sym_matrix(x[:int((n_dim ** 2 + n_dim) / 2)], n_dim)
+        D = sym_matrix(x[int((n_dim ** 2 + n_dim) / 2):int((n_dim ** 2 + n_dim) / 2 + (m_dim ** 2 + m_dim) / 2)], m_dim)
+        Sig = sym_matrix(x[int((n_dim ** 2 + n_dim) / 2 + (m_dim ** 2 + m_dim) / 2):], n_dim)
+
+        # ref variance
+        fp1_row = np.concatenate((Sigp, np.matmul(Sigp, A.T), np.matmul(np.matmul(Sigp, A.T), C.T)), axis=1)
+        fp2_row = np.concatenate((np.matmul(A, Sigp), np.matmul(np.matmul(A, Sigp), A.T) + Bp,
+                                  np.matmul(np.matmul(np.matmul(A, Sigp), A.T), C.T) + np.matmul(Bp, C.T)), axis=1)
+        fp3_row = np.concatenate((np.matmul(C, np.matmul(A, Sigp)),
+                                  np.matmul(np.matmul(np.matmul(C, A), Sigp), A.T) + np.matmul(C, Bp),
+                                  np.matmul(np.matmul(C, Bp), C.T) + D + \
+                                  np.matmul(np.matmul(np.matmul(np.matmul(C, A), Sigp), A.T), C.T)), axis=1)
+        Ref_var = np.concatenate((fp1_row, fp2_row, fp3_row), axis=0)
+
+        # alter var
+        f1_row = np.concatenate((Sig, np.matmul(Sig, A.T), np.matmul(np.matmul(Sig, A.T), C.T)), axis=1)
+        f2_row = np.concatenate((np.matmul(A, Sig), np.matmul(np.matmul(A, Sig), A.T) + B,
+                                 np.matmul(np.matmul(np.matmul(A, Sig), A.T), C.T) + np.matmul(B, C.T)), axis=1)
+        f3_row = np.concatenate((np.matmul(C, np.matmul(A, Sig)),
+                                 np.matmul(np.matmul(np.matmul(C, A), Sig), A.T) + np.matmul(C, B),
+                                 np.matmul(np.matmul(C, B), C.T) + D + \
+                                 np.matmul(np.matmul(np.matmul(np.matmul(C, A), Sig), A.T), C.T)), axis=1)
+        Alter_var = np.concatenate((f1_row, f2_row, f3_row), axis=0)
+
+        # print('Alter var det', np.linalg.det(Alter_var))
+
+        # if np.iscomplexobj(three_mul):
+            # print('Complex sqrt matrix, max imaginary is', np.max(np.abs(three_mul.imag)))
+        K_K = np.linalg.inv(Ref_var) @ Alter_var# A term used in KL distance
+        # if np.linalg.det(K_K) <= 1e-6:
+        #     print('Singular')
+        KL_dist = (np.trace(K_K - np.eye(2*n_dim+m_dim)) - np.log(np.linalg.det(K_K)))/2
+        # print('KL dist', KL_dist)
+
+        res = np.zeros(2 * n_dim + m_dim + 1)
+        res[0] = radius - KL_dist
 
         # B psd constraint
         for k in range(n_dim):
@@ -170,11 +222,14 @@ def optimize(m_dim, n_dim, radius, A, Bp, C, Dp, Sigp, current_obs, pred_mean, m
     # else:
     #     opt_cons = ({'type': 'ineq', 'fun': ot_cons})
 
-    if causal:
+    if algo == 'BCOT':
         # opt_cons = ({'type': 'ineq', 'fun': cot_cons})
         opt_cons = NonlinearConstraint(cot_cons, 0, np.inf, keep_feasible=True)
-    else:
+    elif algo == 'OT':
         opt_cons = NonlinearConstraint(ot_cons, 0, np.inf, keep_feasible=True)
+    elif algo == 'KL':
+        opt_cons = NonlinearConstraint(KL_cons, 0, np.inf, keep_feasible=True)
+
 
     res = minimize(obj, init_x, method='trust-constr',
                    bounds=bnds, constraints=opt_cons,
@@ -192,5 +247,33 @@ def optimize(m_dim, n_dim, radius, A, Bp, C, Dp, Sigp, current_obs, pred_mean, m
     worst_incpt = A @ pred_mean - worst_slope @ C @ A @ pred_mean
     update_mean = worst_slope @ current_obs + worst_incpt
     update_cov =  A @ Sig @ A.T + B - M.T @ np.linalg.inv(K) @ M
+
+    return update_mean, update_cov
+
+
+def KL_pred(n_dim, radius, A, Bp, C, Dp, Sigp, current_obs, pred_mean):
+    # D = A @ Sigp @ A.T + Bp - M.T @ np.linalg.inv(K) @ M
+    CVD = C @ Sigp @ C.T + Dp
+    G = A @ Sigp @ C.T @ np.linalg.inv(CVD)
+    update_mean = A @ pred_mean + G @ (current_obs - C @ pred_mean)
+    P = A @ Sigp @ A.T - G @ CVD @ G.T + Bp
+
+    # find the Lagrange multiplier, KL only, tau = 0
+    value = 1
+    t1 = 0
+    eigenvalues, eigenvectors = np.linalg.eig(P)
+    r = np.max(np.abs(eigenvalues))
+    t2 = (1 - 1e-5)/r
+    while np.abs(value) > 1e-9:
+        th = (t1 + t2)/2
+        eyeP = np.eye(n_dim) - th*P
+        value = np.trace(np.linalg.inv(eyeP) - np.eye(n_dim)) + np.log(np.linalg.det(eyeP)) - radius
+        if value > 0:
+            t2 = th
+        else:
+            t1 = th
+
+    L = np.linalg.cholesky(P)
+    update_cov = L @ np.linalg.inv(np.eye(n_dim) - th * L.T @ L) @ L.T
 
     return update_mean, update_cov

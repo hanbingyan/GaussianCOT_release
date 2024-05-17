@@ -18,15 +18,21 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-CAUSAL_FLAG = True
+ALGO_FLAG = 'KL'
 
-if CAUSAL_FLAG:
-    log_inital = 'COT_track_radi'
-else:
-    log_inital = 'OT_track_radi'
+if ALGO_FLAG == 'BCOT':
+    log_initial = 'BCOT_track_radi'
+elif ALGO_FLAG == 'OT':
+    log_initial = 'OT_track_radi'
+elif ALGO_FLAG == 'KL':
+    log_initial = 'KL_track_radi'
 
 # Max iteration in scipy.optimize
-MaxIter = 20
+if ALGO_FLAG == 'KL':
+    MaxIter = 2       # KL in this implementation is easy to diverge, MaxIter = 2 is the best choice
+else:
+    MaxIter = 20
+
 start = time.time()
 np.random.seed(12345)
 # pre-training data length
@@ -37,6 +43,7 @@ n_ins = 10
 step_num = 100
 
 search_num = 8
+
 radi_arr = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0])
 
 # obs dimension
@@ -70,6 +77,7 @@ def simulator(step_num):
         obs[step, :] = C @ unobs_state[step, :] + \
                        np.random.multivariate_normal(np.zeros(m_dim), D_true, size=1)
     return unobs_state, obs
+
 
 
 
@@ -134,7 +142,7 @@ for r_idx in range(search_num):
         for step in range(step_num):
             next_mean, next_cov = optimize(m_dim, n_dim, radius, A, B_nom, C, D_nom, pre_cov,
                                            obs[step, :].reshape((m_dim, 1)), pre_mean, MaxIter,
-                                           causal=CAUSAL_FLAG, robust=True)
+                                           algo=ALGO_FLAG)
 
             est_state[step, :] = next_mean.reshape(-1)
             est_cov[step, :] = next_cov
@@ -149,8 +157,8 @@ for r_idx in range(search_num):
             # if step % 100 == 0:
             #     print(step, np.sum(np.abs(obs[step, :])), np.sum(np.abs(next_mean)),
             #           np.linalg.det(next_cov), np.linalg.det(filtered_state_covariances[step, :, :]))
-                # print('Estimated Covariance', next_cov)
-                # print('Filtered Covariance', filtered_state_covariances[step, :, :])
+            #     print('Estimated Covariance', next_cov)
+            #     print('Filtered Covariance', filtered_state_covariances[step, :, :])
 
         # print('Mean dB', dB.mean())
         # print(np.divide(np.sum(np.abs(unobs_state - est_state), axis=1), np.sum(np.abs(unobs_state), axis=1)))
@@ -170,7 +178,7 @@ for r_idx in range(search_num):
         print('Time elapsed', end - start)
 
 
-    log_dir = "./logs/{}_{}".format(log_inital, radius)
+    log_dir = "./logs/{}_{}".format(log_initial, radius)
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
 

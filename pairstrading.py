@@ -11,9 +11,9 @@ warnings.filterwarnings("ignore", message="delta_grad == 0.0. Check if the appro
 
 # Transaction cost percentage
 trcost_perc = 0.0001
-MaxIter = 20
-CAUSAL = True
-ROBUST = True
+# Initial wealth
+init_wealth = 10000.0
+
 # m is dim of observations
 m_dim = 1
 # n is dim of unobserved states
@@ -23,14 +23,24 @@ burn_len = 100
 # points used in rolling window of spread estimation
 window_size = 20
 
-if ROBUST:
-    search_num = 10
-else:
+ALGO_FLAG = 'OT'
+
+if ALGO_FLAG == 'Nonrobust':
     search_num = 1
+else:
+    search_num = 10
+
+if ALGO_FLAG == 'KL':
+    MaxIter = 2     #
+else:
+    MaxIter = 20
+
+# radi_arr = np.linspace(0.01, 0.2, search_num)
 
 radi_arr = np.linspace(0.1, 1.0, search_num)
 sharpe = np.zeros_like(radi_arr)
 sortino = np.zeros_like(radi_arr)
+terminal_wealth = np.zeros_like(radi_arr)
 
 for r_idx in range(search_num):
 
@@ -79,7 +89,7 @@ for r_idx in range(search_num):
         C[0, 1] = X_Close[step]
         next_mean, next_cov = optimize(m_dim, n_dim, radius, A, Bp, C, Dp, pre_cov,
                                        obs[step, :].reshape((m_dim, 1)), pre_mean, MaxIter,
-                                       causal=CAUSAL, robust=ROBUST)
+                                       algo=ALGO_FLAG)
 
         est_state[step, :] = next_mean.reshape(-1)
         est_cov[step, :] = next_cov
@@ -109,7 +119,7 @@ for r_idx in range(search_num):
     # stock trading volume
     quantity = 100
     cash = np.zeros(horizon)
-    cash[:idx] = 10000.0
+    cash[:idx] = init_wealth
     stock_value = np.zeros(horizon)
 
     while idx < horizon:
@@ -182,8 +192,8 @@ for r_idx in range(search_num):
 
 
 
-    if ROBUST:
-        sub_folder = '{}_{}_{}_{}_{}'.format('causal', CAUSAL, 'robust', ROBUST, round(radius, 2))
+    if ALGO_FLAG != 'Nonrobust':
+        sub_folder = '{}_{}'.format(ALGO_FLAG, round(radius, 2))
 
         log_dir = './logs/{}'.format(sub_folder)
 
@@ -193,8 +203,7 @@ for r_idx in range(search_num):
         # Save params configuration
         with open('{}/params.txt'.format(log_dir), 'w') as fp:
             fp.write('Params setting \n')
-            fp.write('COT: {} \n'.format(CAUSAL))
-            fp.write('Robust: {} \n'.format(ROBUST))
+            fp.write('Algorithm: {} \n'.format(ALGO_FLAG))
             fp.write('Bp: {} \n'.format(Bp))
             fp.write('Dp: {} \n'.format(Dp))
             fp.write('init_mean: {} \n'.format(init_mean))
@@ -241,6 +250,8 @@ for r_idx in range(search_num):
     sharpe[r_idx] = (rtn_mean - 0.02/252)/rtn.std()*np.sqrt(252)
     sortino[r_idx] = (rtn_mean - 0.02/252)/rtn[so_idx].std()*np.sqrt(252)
 
+    terminal_wealth[r_idx] = ptf[-1]
+
     print('Sharpe ratio of strategy:', sharpe[r_idx])
     print('Sortino ratio of strategy:', sortino[r_idx])
 
@@ -249,22 +260,26 @@ for r_idx in range(search_num):
     X_idx = X_rtn < X_m
     print('Asset 1 Sharpe ratio:', (X_m - 0.02/252)/X_rtn.std()*np.sqrt(252))
     print('Asset 1 Sortino ratio:', (X_m - 0.02/252)/X_rtn[X_idx].std()*np.sqrt(252))
+    print('Terminal wealth if invested in Asset 1 only', X_Close[-1]/X_Close[0]*init_wealth)
 
     Y_rtn = np.divide(Y_Close[1:] - Y_Close[:-1], Y_Close[:-1])
     Y_m = Y_rtn.mean()
     Y_idx = Y_rtn < Y_m
     print('Asset 2 Sharpe ratio:', (Y_m - 0.02/252)/Y_rtn.std()*np.sqrt(252))
     print('Asset 2 Sortino ratio:', (Y_m - 0.02/252)/Y_rtn[Y_idx].std()*np.sqrt(252))
+    print('Terminal wealth if invested in Asset 2 only', Y_Close[-1]/Y_Close[0]*init_wealth)
 
 print('Sharpe')
 print(np.round(sharpe, 4))
 print('Sortino')
 print(np.round(sortino, 4))
+print('Terminal wealth')
+print(np.round(terminal_wealth, 0))
 
-if ROBUST:
-    with open('./logs/sharpe_causal_{}.pickle'.format(CAUSAL), 'wb') as fp:
+if ALGO_FLAG != 'Nonrobust':
+    with open('./logs/sharpe_{}.pickle'.format(ALGO_FLAG), 'wb') as fp:
         pickle.dump(sharpe, fp)
 
-    with open('./logs/sortino_causal_{}.pickle'.format(CAUSAL), 'wb') as fp:
+    with open('./logs/sortino_{}.pickle'.format(ALGO_FLAG), 'wb') as fp:
         pickle.dump(sortino, fp)
 

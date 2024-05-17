@@ -21,7 +21,7 @@ cot_vel_diff = np.zeros((n_radi, n_ins, n_step))
 
 for r_idx in range(n_radi):
     radius = radi_arr[r_idx]
-    cot_dir = "./logs/COT_track_radi_{}".format(radius)
+    cot_dir = "./logs/BCOT_track_radi_{}".format(radius)
     ot_dir = "./logs/OT_track_radi_{}".format(radius)
     with open('{}/obs.pickle'.format(cot_dir), 'rb') as fp:
         obs = pickle.load(fp)
@@ -103,10 +103,18 @@ plt.tick_params(axis = 'both', which = 'major', labelsize = 14)
 # ax.legend(bbox_to_anchor=(0.1, 1), title='Algorithm', fontsize=16, title_fontsize=16)
 # plt.show()
 plt.savefig('poi_diff.pdf', format='pdf', dpi=1000, bbox_inches='tight', pad_inches=0.1)
-print('Mean COT Posi difference', np.round(np.mean(cot_poi_diff, axis=(1, 2)), 4))
-print('Var COT Posi difference', np.round(np.var(cot_poi_diff, axis=(1, 2)), 4))
-print('Mean OT Posi difference', np.round(np.mean(ot_poi_diff, axis=(1, 2)), 4))
-print('Var OT Posi difference', np.round(np.var(ot_poi_diff, axis=(1, 2)), 4))
+
+COTPoi_mean = np.mean(cot_poi_diff, axis=(1, 2))
+COTPoi_std = np.std(cot_poi_diff, axis=(1, 2))
+OTPoi_mean = np.mean(ot_poi_diff, axis=(1, 2))
+OTPoi_std = np.std(ot_poi_diff, axis=(1, 2))
+
+print('Mean BCOT Posi difference', np.round(COTPoi_mean, 4))
+print('STD BCOT Posi difference', np.round(COTPoi_std, 4))
+print('BCOT Mean/STD ratio', np.round(np.divide(COTPoi_mean, COTPoi_std), 4))
+print('Mean OT Posi difference', np.round(OTPoi_mean, 4))
+print('STD OT Posi difference', np.round(OTPoi_std, 4))
+print('OT Mean/STD ratio', np.round(np.divide(OTPoi_mean, OTPoi_std), 4))
 
 ################ Velocity error #################
 errdf1 = []
@@ -126,7 +134,16 @@ plt.tick_params(axis = 'both', which = 'major', labelsize = 14)
 # ax.legend(bbox_to_anchor=(0.1, 1), title='Algorithm', fontsize=16, title_fontsize=16)
 # plt.show()
 plt.savefig('vel_diff.pdf', format='pdf', dpi=1000, bbox_inches='tight', pad_inches=0.1)
-print('Mean COT Vel difference', np.round(np.mean(cot_vel_diff, axis=(1, 2)), 4))
-print('Var COT Vel difference', np.round(np.var(cot_vel_diff, axis=(1, 2)), 4))
-print('Mean OT Vel difference', np.round(np.mean(ot_vel_diff, axis=(1, 2)), 4))
-print('Var OT Vel difference', np.round(np.var(ot_vel_diff, axis=(1, 2)), 4))
+
+
+COTVel_mean = np.mean(cot_vel_diff, axis=(1, 2))
+COTVel_std = np.std(cot_vel_diff, axis=(1, 2))
+OTVel_mean = np.mean(ot_vel_diff, axis=(1, 2))
+OTVel_std = np.std(ot_vel_diff, axis=(1, 2))
+
+print('Mean BCOT Vel difference', np.round(COTVel_mean, 4))
+print('STD BCOT Vel difference', np.round(COTVel_std, 4))
+print('BCOT Mean/STD ratio', np.round(np.divide(COTVel_mean, COTVel_std), 4))
+print('Mean OT Vel difference', np.round(OTVel_mean, 4))
+print('STD OT Vel difference', np.round(OTVel_std, 4))
+print('OT Mean/STD ratio', np.round(np.divide(OTVel_mean, OTVel_std), 4))

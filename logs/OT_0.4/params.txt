@@ -1,0 +1,15 @@
+Params setting 
+Algorithm: OT 
+Bp: [[1. 0.]
+ [0. 1.]] 
+Dp: [[1.]] 
+init_mean: [[8.61464549e+01]
+ [4.43400259e-02]] 
+init_cov: [[1. 0.]
+ [0. 1.]] 
+radius: 0.4 
+horizon: 773 
+open thres: 2.0 
+close thres: 0.0 
+stock trading quantity: 100 
+maxiter: 20 

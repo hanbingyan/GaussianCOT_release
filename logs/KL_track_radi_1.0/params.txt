@@ -1,0 +1,3 @@
+Params setting 
+radius 1.0, n_ins 10, step_num 100 
+Maxiter = 2 
